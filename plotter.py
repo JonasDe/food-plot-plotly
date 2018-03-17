@@ -11,29 +11,37 @@ conn = sqlite3.connect('nutrients.db')
 
 c = conn.cursor()
 
-col_names= ['Livsmedelsnamn', 'Protein_g', 'kcal', 'Fett_g', 'Kolhydrater_g']
-rows = c.execute('SELECT {}, {} ,{}, {}, {} from livsmedel order by Livsmedelsnamn'.format(*col_names))
+col_names= ['Livsmedelsnamn', 'Protein_g', 'kcal', 'Fett_g', 'Kolhydrater_g', 'Vatten_g']
+rows = c.execute('SELECT {}, {} ,{}, {}, {}, {} from livsmedel order by Livsmedelsnamn'.format(*col_names))
 
-name, prot, kcal, fat, carb = list(map(list, list(zip(*rows))))
+name, prot, kcal, fat, carb, water = list(map(list, list(zip(*rows))))
 
 
-N = len(prot)
+N         = len(prot)
+x         = prot
+y         = fat
+size      = kcal
+color_val = water
+max_size  = 20
+min_size  = 5
+max_color = 255
+# norm_x    = max_color/max(water)
+# norm_y    = max_color/max(y)
+norm_b    = max_color/max(water)
+norm_size = max_size/max(size)
 
-x = prot
-y = fat
 
-norm_x = 255/max(x)
-norm_y = 255/max(y)
 
-color = ['rgb({},{},0)'.format(r*norm_x,g*norm_y) for r,g in zip(x,y)]
-
+color = ['rgb(0,0,{})'.format(norm_b*w) for w in water]
+size = [max(min_size, s*norm_size) for s in size]
 trace0=go.Scatter(
         x=x,
         y=y,
         text=name,
         mode='markers',
         marker=dict(
-            color=color
+            color=color,
+            size=size
             )
         )
 layout = go.Layout(hovermode='closest')
