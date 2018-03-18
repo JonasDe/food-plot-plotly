@@ -1,0 +1,17 @@
+{"resolution": 5,
+    "x": "Protein_g",
+    "y": "kcal",
+    "size_axis": "Fett_g",
+    "color_axis": "Vatten_g",
+    "color_scale": {
+        "R": false,
+        "G": true,
+        "B": true,
+        "max": 255
+    },
+    "min_size": 5,
+    "max_size": 20,
+    "username": "Enter Here",
+    "api_key": "Enter Api Key"
+}
+

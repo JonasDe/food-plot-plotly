@@ -6,31 +6,25 @@ import sqlite3
 import numpy as np
 import json
 
-credentials = json.loads(open('credentials.json', 'r').read())
-cfg = json.loads(open('credentials.json', 'r').read())
-plotly.tools.set_credentials_file(username=credentials['username'], api_key=credentials['api_key'])
-conn = sqlite3.connect('nutrients.db')
+def labelize(s):
+    return s.split('_')[0]
 
-c = conn.cursor()
 
-col_names= ['Livsmedelsnamn', 'Protein_g', 'kcal', 'Fett_g', 'Kolhydrater_g', 'Vatten_g']
-rows = c.execute('SELECT {}, {} ,{}, {}, {}, {} from livsmedel order by Livsmedelsnamn'.format(*col_names))
-
-name, prot, kcal, fat, carb, water = list(map(list, list(zip(*rows))))
-relevant = [name, prot, fat, kcal, water]
-names    = ['Protein', 'Fat', 'kcal', 'water']
-
-N         = len(prot)
 
 
 def gen_trace(name, x,y, size, color, visible=False):
-    max_size  = 20
-    min_size  = 5
-    max_color = 255
-
+    global cfg
+    max_size  = cfg['max_size']
+    min_size  = cfg['min_size']
+    max_color = cfg['color_scale']['max']
     norm_b    = max_color/max(color)
     norm_size = max_size/max(size)
-    color = ['rgb(0,0,{})'.format(norm_b*c) for c in color]
+    R = cfg['color_scale']['R']
+    G = cfg['color_scale']['G']
+    B = cfg['color_scale']['B']
+    
+
+    color = ['rgb({},{},{})'.format(norm_b*c*R,norm_b*c*G, norm_b*c*B) for c in color]
     size = [max(min_size, norm_size*s) for s in size]
 
     return go.Scatter(
@@ -53,7 +47,7 @@ def menus(labels=[("None", 0)]):
         return dict(label = label_str.format(val, name),
                 method = 'update',
                 args = [{'visible': visible },
-                    {'title': label_str}]
+                    {'title': label_str.format(val, labelize(name))}]
                 )
     return list([
         dict(type="buttons",
@@ -84,20 +78,44 @@ def filtered_category(lists, resolution=4, dimension=0):
     cutoffs = [filtered_trace_data[i][1] for i in range(len(filtered_trace_data))]
     return traces, cutoffs
 
+
+def load():
+    global cfg
+    credentials = json.loads(open('credentials.json', 'r').read())
+    cfg = json.loads(open('cfg.json', 'r').read())
+    plotly.tools.set_credentials_file(username=cfg['username'], api_key=cfg['api_key'])
+    conn = sqlite3.connect('nutrients.db')
+    c = conn.cursor()
+    col_names= ['Livsmedelsnamn', cfg['x'], cfg['y'], cfg['size_axis'], cfg['color_axis']]
+    rows = c.execute('SELECT {}, {} ,{}, {}, {} from livsmedel order by Livsmedelsnamn'.format(*col_names))
+
+    cols  = list(map(list, list(zip(*rows))))
+    names = list(map(labelize, col_names[1:]))
+    N     = len(cols[0])
+    return cols, names, N
+
+
+global cfg
+
+cols, names, N = load()
 dimensions = len(names)
 cutoffs = []
 traces = []
 resolution = 5
 
 for i in range(dimensions):
-    trace, cutoff = filtered_category(relevant, resolution=resolution, dimension=i) 
+    trace, cutoff = filtered_category(cols, resolution=resolution, dimension=i) 
     traces.extend(trace)
     cutoffs.extend(cutoff)
 
 name_labels = [[i]*resolution for i in names]
 button_labels = list(zip(flatten(name_labels),cutoffs))
 updatemenus = menus(button_labels)
-layout = go.Layout(hovermode='closest', updatemenus=updatemenus)
+layout = go.Layout(hovermode='closest', updatemenus=updatemenus,
+        xaxis=dict(title=names[0]),
+        yaxis=dict(title=names[1]),
+        
+        )
 data = traces
 fig = go.Figure(data=data, layout=layout)
 plot(fig, filename='food-protx-kcaly')
