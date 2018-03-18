@@ -97,37 +97,39 @@ def load():
     return cols, names, N
 
 
-global cfg, max_x, max_y, resolution, max_s_in_dataset, max_c_in_dataset
 
-cols, names, N = load()
-max_x = max(cols[1])
-max_y = max(cols[2])
-max_s_in_dataset = max(cols[3])
-max_c_in_dataset = max(cols[4])
+def gen_plt(cols, names, N):
+    resolution = cfg['resolution']
+    margin = 1.1
+    dimensions = len(names)
+    cutoffs = []
+    traces = []
+    for i in range(dimensions):
+        trace, cutoff = filtered_category(cols, resolution=resolution, dimension=i) 
+        traces.extend(trace)
+        cutoffs.extend(cutoff)
 
-dimensions = len(names)
-cutoffs = []
-traces = []
-resolution = 5
+    name_labels = [[i]*resolution for i in names]
+    button_labels = list(zip(flatten(name_labels),cutoffs))
+    updatemenus = menus(button_labels)
+    layout = go.Layout(hovermode='closest', updatemenus=updatemenus,
+            xaxis=dict(title=names[0], range=[0,max_x*margin]),
+            yaxis=dict(title=names[1], range=[0,max_y*margin]),
+            
+            )
+    data = traces
+    fig = go.Figure(data=data, layout=layout)
+    plot(fig, filename='food')
 
-for i in range(dimensions):
-    trace, cutoff = filtered_category(cols, resolution=resolution, dimension=i) 
-    traces.extend(trace)
-    cutoffs.extend(cutoff)
+def main():
+    global cfg, max_x, max_y, resolution, max_s_in_dataset, max_c_in_dataset
+    cols, names, N = load()
+    max_x = max(cols[1])
+    max_y = max(cols[2])
+    max_s_in_dataset = max(cols[3])
+    max_c_in_dataset = max(cols[4])
 
-name_labels = [[i]*resolution for i in names]
-button_labels = list(zip(flatten(name_labels),cutoffs))
+    gen_plt(cols, names, N)
 
-updatemenus = menus(button_labels)
-
-
-
-margin = 1.1
-layout = go.Layout(hovermode='closest', updatemenus=updatemenus,
-        xaxis=dict(title=names[0], range=[0,max_x*margin]),
-        yaxis=dict(title=names[1], range=[0,max_y*margin]),
-        
-        )
-data = traces
-fig = go.Figure(data=data, layout=layout)
-plot(fig, filename='food-protx-kcaly')
+if __name__ == '__main__':
+    main()
