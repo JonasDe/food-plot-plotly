@@ -7,6 +7,7 @@ import numpy as np
 import json
 
 credentials = json.loads(open('credentials.json', 'r').read())
+cfg = json.loads(open('credentials.json', 'r').read())
 plotly.tools.set_credentials_file(username=credentials['username'], api_key=credentials['api_key'])
 conn = sqlite3.connect('nutrients.db')
 
@@ -16,12 +17,13 @@ col_names= ['Livsmedelsnamn', 'Protein_g', 'kcal', 'Fett_g', 'Kolhydrater_g', 'V
 rows = c.execute('SELECT {}, {} ,{}, {}, {}, {} from livsmedel order by Livsmedelsnamn'.format(*col_names))
 
 name, prot, kcal, fat, carb, water = list(map(list, list(zip(*rows))))
-relevant = [prot, fat, kcal, water]
+relevant = [name, prot, fat, kcal, water]
+names    = ['Protein', 'Fat', 'kcal', 'water']
 
 N         = len(prot)
 
 
-def gen_trace(x,y, size, color):
+def gen_trace(name, x,y, size, color, visible=False):
     max_size  = 20
     min_size  = 5
     max_color = 255
@@ -36,55 +38,66 @@ def gen_trace(x,y, size, color):
             y=y,
             text=name,
             mode='markers',
+            visible=visible,
             marker=dict(
                 color=color,
                 size=size
                 )
             )
 
-def menus(buttons=4, name="unknown"):
-    def button(idx):
-        return dict(label = "{}% {}".format(idx*25, name),
+def menus(labels=[("None", 0)]):
+    size = len(labels)
+    def button(idx, name, val):
+        visible = [b==idx for b  in range(size)]
+        label_str = "<={}g {}"
+        return dict(label = label_str.format(val, name),
                 method = 'update',
-                args = [{'visible': [b==idx for b  in range(buttons)]},
-                    {'title': 'Food'}]
+                args = [{'visible': visible },
+                    {'title': label_str}]
                 )
     return list([
         dict(type="buttons",
-             active=-1,
-             buttons=list([button(i) for i in range(buttons)]),
-        )
+             active=1,
+             buttons=list([button(i, labels[i][0], labels[i][1]) for i in range(size)]),)
 
     ])
 
-def filtered_trace(lists, threshold=0, filter_idx=0):
-    x,y,size,color = lists
-
+def filtered_trace(lists, threshold=0, filter_idx=0, visible=False):
+    n,x,y,size,color = lists
+    lists = lists[1:]
     filter_list = lists[filter_idx]
-    # prot
-    # max prot = 86
     min_v = min(filter_list)
     max_v = max(filter_list)
-
-    indices = [i for i in range(len(filter_list)) if 100*((filter_list[i]-min_v)/(max_v-min_v)) >= threshold]
+    indices = [i for i in range(len(filter_list)) if 100*((filter_list[i]-min_v)/(max_v-min_v)) <= threshold]
     x = [x[i] for i in indices]
     y = [y[i] for i in indices]
-    print(y)
-    print(x)
+    n = [n[i] for i in indices]
+    cutoff_val = (max_v-min_v)*threshold/100
+    return (gen_trace(n,x,y,size,color, visible), cutoff_val)
 
-    return gen_trace(x,y,size,color), min_v, max_v
+def flatten(l):
+    return [item for sublist in l for item in sublist]
 
-lists = [prot, fat, kcal, water]
+def filtered_category(lists, resolution=4, dimension=0):
+    filtered_trace_data = [filtered_trace(lists, (100/resolution)*i, dimension, dimension==0 and i == 1) for i in range(1, resolution+1)]
+    traces = [filtered_trace_data[i][0] for i in range(len(filtered_trace_data))]
+    cutoffs = [filtered_trace_data[i][1] for i in range(len(filtered_trace_data))]
+    return traces, cutoffs
 
-filtered_trace_data = [filtered_trace(lists, 25*i) for i in [1,2,3,4]]
-traces = [t[0] for t in filtered_trace_data]
-labels = [mi-maxfor t,mi,ma, in filtered_trace_data]
+dimensions = len(names)
+cutoffs = []
+traces = []
+resolution = 5
 
+for i in range(dimensions):
+    trace, cutoff = filtered_category(relevant, resolution=resolution, dimension=i) 
+    traces.extend(trace)
+    cutoffs.extend(cutoff)
 
-updatemenus = menus(name="protein")
-
+name_labels = [[i]*resolution for i in names]
+button_labels = list(zip(flatten(name_labels),cutoffs))
+updatemenus = menus(button_labels)
 layout = go.Layout(hovermode='closest', updatemenus=updatemenus)
-
 data = traces
 fig = go.Figure(data=data, layout=layout)
 plot(fig, filename='food-protx-kcaly')
