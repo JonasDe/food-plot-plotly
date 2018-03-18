@@ -10,8 +10,6 @@
         "max": 255
     },
     "min_size": 5,
-    "max_size": 20,
-    "username": "Enter Here",
-    "api_key": "Enter Api Key"
+    "max_size": 20
 }
 

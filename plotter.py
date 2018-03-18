@@ -1,6 +1,8 @@
 import plotly
+import plotly.plotly as py
 from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
 from itertools import permutations
+
 import plotly.graph_objs as go
 import sqlite3
 import numpy as np
@@ -13,12 +15,12 @@ def labelize(s):
 
 
 def gen_trace(name, x,y, size, color, visible=False):
-    global cfg
+    global cfg, max_s_in_dataset, max_c_in_dataset
     max_size  = cfg['max_size']
     min_size  = cfg['min_size']
     max_color = cfg['color_scale']['max']
-    norm_b    = max_color/max(color)
-    norm_size = max_size/max(size)
+    norm_b    = max_color/max_c_in_dataset
+    norm_size = max_size/max_s_in_dataset
     R = cfg['color_scale']['R']
     G = cfg['color_scale']['G']
     B = cfg['color_scale']['B']
@@ -51,7 +53,7 @@ def menus(labels=[("None", 0)]):
                 )
     return list([
         dict(type="buttons",
-             active=1,
+             active=0,
              buttons=list([button(i, labels[i][0], labels[i][1]) for i in range(size)]),)
 
     ])
@@ -63,9 +65,11 @@ def filtered_trace(lists, threshold=0, filter_idx=0, visible=False):
     min_v = min(filter_list)
     max_v = max(filter_list)
     indices = [i for i in range(len(filter_list)) if 100*((filter_list[i]-min_v)/(max_v-min_v)) <= threshold]
-    x = [x[i] for i in indices]
-    y = [y[i] for i in indices]
-    n = [n[i] for i in indices]
+    x          = [x[i] for i in indices]
+    y          = [y[i] for i in indices]
+    size       = [size[i] for i in indices]
+    color      = [color[i] for i in indices]
+    n          = [n[i] for i in indices]
     cutoff_val = (max_v-min_v)*threshold/100
     return (gen_trace(n,x,y,size,color, visible), cutoff_val)
 
@@ -81,9 +85,7 @@ def filtered_category(lists, resolution=4, dimension=0):
 
 def load():
     global cfg
-    credentials = json.loads(open('credentials.json', 'r').read())
     cfg = json.loads(open('cfg.json', 'r').read())
-    plotly.tools.set_credentials_file(username=cfg['username'], api_key=cfg['api_key'])
     conn = sqlite3.connect('nutrients.db')
     c = conn.cursor()
     col_names= ['Livsmedelsnamn', cfg['x'], cfg['y'], cfg['size_axis'], cfg['color_axis']]
@@ -95,9 +97,14 @@ def load():
     return cols, names, N
 
 
-global cfg
+global cfg, max_x, max_y, resolution, max_s_in_dataset, max_c_in_dataset
 
 cols, names, N = load()
+max_x = max(cols[1])
+max_y = max(cols[2])
+max_s_in_dataset = max(cols[3])
+max_c_in_dataset = max(cols[4])
+
 dimensions = len(names)
 cutoffs = []
 traces = []
@@ -110,10 +117,15 @@ for i in range(dimensions):
 
 name_labels = [[i]*resolution for i in names]
 button_labels = list(zip(flatten(name_labels),cutoffs))
+
 updatemenus = menus(button_labels)
+
+
+
+margin = 1.1
 layout = go.Layout(hovermode='closest', updatemenus=updatemenus,
-        xaxis=dict(title=names[0]),
-        yaxis=dict(title=names[1]),
+        xaxis=dict(title=names[0], range=[0,max_x*margin]),
+        yaxis=dict(title=names[1], range=[0,max_y*margin]),
         
         )
 data = traces
